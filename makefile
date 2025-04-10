@@ -1,6 +1,7 @@
 
 OBJ1 = fon.o client.o 
 OBJ2 = fon.o serveur.o 
+OBJ3 = fon.o serveur_parallele.o 
 OPTIONS	=
 # Adaptation a Darwin / MacOS X avec fink
 # Du fait de l'absence de libtermcap on se fait pas mal
@@ -29,7 +30,7 @@ OPTIONS	+= -ltermcap  -lsocket -lnsl
 CFLAGS	+= -I..
 endif
 
-EXEC = ${OBJ1} client ${OBJ2} serveur
+EXEC = ${OBJ1} client ${OBJ2} serveur ${OBJ3} serveur_parallele
 all: ${EXEC} 	
 
 
@@ -43,13 +44,17 @@ client.o : fon.h	client.c
 serveur.o : fon.h	serveur.c 
 	gcc  $(CFLAGS) -c  serveur.c	
 
+serveur_parallele.o : fon.h	serveur.c 
+	gcc  $(CFLAGS) -c  serveur_parallele.c
+
 client : ${OBJ1}	
 	gcc $(LFLAGS) ${OBJ1} -o client -lcurses   $(OPTIONS)
 
 serveur : ${OBJ2}	
 	gcc $(LFLAGS) ${OBJ2} -o serveur -lcurses   $(OPTIONS)
 
-
+serveur_parallele : ${OBJ3}	
+	gcc $(LFLAGS) ${OBJ3} -o serveur_parallele -lcurses   $(OPTIONS)
 
 clean : 
 	rm -f ${EXEC} core

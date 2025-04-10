@@ -6,4 +6,7 @@ Pour le proposition: écrire les chiffre un par un (avec espace) comme: 1 2 3 4 
 
 Nous avons utilisé des nombres au lieu des couleurs.
 
+Le fichier serveur.c est de type itératif.
+Le fichier serveur_parallele.c est de type parallèle.
+
 

@@ -27,8 +27,6 @@
 /* Définition du numéro de service par défaut */
 #define SERVICE_DEFAUT "1111"
 
-void serveur_appli(char *service); /* programme serveur */
-
 /* Prototypes des fonctions auxiliaires */
 int *generate_secret_code(int niveau); // Génère un code secret aléatoire
 void calculate_result(int niveau, int secret[], int proposition[], int *red,
@@ -38,14 +36,17 @@ static int
 read_line(int sock, char *buf,
           int max_len); // Lit une ligne depuis la socket (pareil dans client.c)
 
+/* Prototype de la fonction qui gère une session client individuelle */
+void game_session(int sock_client);
+
+void serveur_appli(char *service); /* programme serveur */
+
 /*****************************************************************************/
 /*---------------- Programme serveur ------------------------------*/
 
 int main(int argc, char *argv[]) {
 
   char *service = SERVICE_DEFAUT; /* numéro de service par défaut */
-
-  /* Permet de passer un nombre de parametre variable a l'executable */
   switch (argc) {
   case 1:
     printf("Service par défaut = %s\n", service);
@@ -58,183 +59,183 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  /* Pour éviter les processus zombies, on ignore SIGCHLD */
+  signal(SIGCHLD, SIG_IGN);
+
   /* service est le service (ou numero de port) auquel sera affecte
-        ce serveur*/
+       ce serveur*/
 
   serveur_appli(service);
-
   return 0;
 }
 
-/******************************************************************************/
 void serveur_appli(char *service)
-/* Procedure correspondant au traitemnt du serveur de votre application */
-
+/* Traitement du serveur en mode parallèle */
 {
-  int sock, sock_client;         // Socket d'écoute et de connexion
-  struct sockaddr_in *adr_serv;  // Adresse du serveur
-  struct sockaddr_in adr_client; // Adresse du client
-  char buffer[256];              // Buffer pour les messages
+  int sock, sock_client;
+  struct sockaddr_in *adr_serv;
+  struct sockaddr_in adr_client;
+  char buffer[256];
 
   /* Création de la socket TCP */
-  sock = h_socket(AF_INET, SOCK_STREAM); // création de la socket TCP en
-                                         // utilisant IP protocol family.
-  // Comme décrit dans la page 4 du SOCKET.pdf, le mode de la socket est
-  // SOCK_STREAM pour TCP.
-  if (sock < 0) { // si la socket n'est pas créée on affiche une erreur
+  sock = h_socket(AF_INET, SOCK_STREAM);
+  if (sock < 0) {
     perror("Erreur lors de h_socket");
-    exit(EXIT_FAILURE); // sortie du programme
+    exit(EXIT_FAILURE);
   }
 
   /* Préparation de l'adresse d'écoute – écouter sur toutes les interfaces */
   adr_socket(service, NULL, SOCK_STREAM, &adr_serv);
 
   /* Association (bind) et mise en écoute */
-  h_bind(sock, adr_serv); // lie la socket à l'adresse server (avec no port)
-  h_listen(sock, 5);      // met la socket en écoute
+  h_bind(sock, adr_serv);
+  h_listen(sock, 5);
   printf("Serveur en écoute sur le port %s...\n", service);
 
-  /* Acceptation d'une connexion client */
-  sock_client = h_accept(sock, &adr_client);
-  printf("Connexion établie avec un client.\n");
+  /* Boucle infinie d'acceptation de connexions entrantes */
+  while (1) {
+    sock_client = h_accept(sock, &adr_client);
+    if (sock_client < 0) {
+      perror("Erreur lors de l'acceptation d'une connexion");
+      continue;
+    }
+    printf("Connexion établie avec un client.\n");
 
-  /* Envoi d'un message de bienvenue au client */
-  // c'est comme un test de connection
+    /* Création d'un processus fils pour gérer cette session client */
+    pid_t pid = fork();
+    if (pid < 0) {
+      perror("Erreur lors de fork");
+      h_close(sock_client);
+      continue;
+    }
+    if (pid == 0) {
+      /* Processus fils */
+      h_close(sock); // Le fils n'a pas besoin de la socket d'écoute
+      game_session(sock_client);
+      /* La fonction game_session se charge de fermer la socket et de terminer
+       */
+    } else {
+      /* Processus père : il ferme la socket client et retourne à l'accept */
+      h_close(sock_client);
+    }
+  }
+
+  /* Note : on n'atteint jamais ce point */
+  h_close(sock);
+}
+
+/*
+   Fonction game_session :
+   Gère une session de jeu avec un client. Cette fonction envoie le message de
+   bienvenue, lit la commande LEVEL, lance le jeu (plusieurs parties si le
+   client souhaite rejouer) et ferme la connexion à la fin.
+*/
+void game_session(int sock_client) {
+  char buffer[256];
+  int niveau;
+
+  /* Envoi du message de bienvenue */
   memset(buffer, 0, sizeof(buffer));
   sprintf(buffer, "Bienvenue dans Mastermind !\n");
   h_writes(sock_client, buffer, strlen(buffer));
-  printf("Message de bienvenue envoyé au client.\n");
+  printf("Message de bienvenue envoyé au client (PID fils: %d).\n", getpid());
 
-  /* Boucle de session de jeu sur une même connexion */
-  int session = 1; // pour controller le deroulement de la session
-  // on initialise la session à 1 pour que le client puisse jouer
-  // on va lui demander de jouer jusqu'à ce qu'il ne veuille plus
-  // ou qu'il y ait une erreur
+  /* Boucle de session de jeu pour ce client */
+  int session = 1;
   while (session) {
     /* Lecture de la commande LEVEL envoyée par le client */
-    memset(buffer, 0, sizeof(buffer)); // on vide le buffer
-    if (read_line(sock_client, buffer, sizeof(buffer)) <=
-        0) { // read and prend la valeur de niveau donnée par le client dans un
-             // buffer
-      printf("Erreur lors de la lecture de la commande LEVEL.\n");
+    memset(buffer, 0, sizeof(buffer));
+    if (read_line(sock_client, buffer, sizeof(buffer)) <= 0) {
+      printf(
+          "Erreur lors de la lecture de la commande LEVEL ou déconnexion.\n");
       break;
     }
-
-    int niveau;
-    if (sscanf(buffer, "LEVEL %d", &niveau) !=
-        1) { // extraction du niveau depuis un buffer
+    if (sscanf(buffer, "LEVEL %d", &niveau) != 1) {
       printf("Commande LEVEL non reconnue.\n");
       break;
     }
-    printf("Niveau reçu : %d positions.\n", niveau);
+    printf("Niveau reçu : %d positions (client PID: %d).\n", niveau, getpid());
 
-    /* Génération du code secret */
     srand(time(NULL)); // Initialisation du générateur de nombres aléatoires
-    int *secret = generate_secret_code(
-        niveau); // on génère le code secret avec une methode auxiliare
-    printf("Code secret généré : ");
+    /* Génération du code secret */
+    int *secret = generate_secret_code(niveau);
+    printf("Code secret généré pour le client (PID %d) : ", getpid());
     for (int i = 0; i < niveau; i++) {
-      printf("%d ", secret[i]); // on affiche le code secret
+      printf("%d ", secret[i]);
     }
     printf("\n");
 
     /* Boucle de traitement d'une partie */
-    int gagne = 0; // une variable pour controller si le client a gagné ou pas
-    // on lui demande de nous donner une proposition jusqu'à ce qu'il gagne ou
-    // quitte
+    int gagne = 0;
     while (!gagne) {
-      memset(buffer, 0, sizeof(buffer)); // on vide le buffer
-      int nb_octets =
-          read_line(sock_client, buffer,
-                    sizeof(buffer)); // on lit la proposition du client avec une
-                                     // methode auxiliaire
-      // on controlle si la lecture s'est bien passée
+      memset(buffer, 0, sizeof(buffer));
+      int nb_octets = read_line(sock_client, buffer, sizeof(buffer));
       if (nb_octets <= 0) {
-        printf("Erreur de lecture ou déconnexion du client.\n");
-        gagne = 1; /* Quitter la partie */
+        printf("Erreur de lecture ou déconnexion du client (PID: %d).\n",
+               getpid());
+        gagne = 1;
         break;
       }
 
       /* Décodage de la proposition */
-      int *proposition = (int *)malloc(
-          niveau * sizeof(int)); // allocation de mémoire pour la proposition
-      if (proposition ==
-          NULL) { // on controlle si l'allocation s'est bien passée
+      int *proposition = (int *)malloc(niveau * sizeof(int));
+      if (proposition == NULL) {
         perror("Erreur d'allocation mémoire pour la proposition");
         break;
       }
       int j = 0;
-      char *token = strtok(
-          buffer, " "); // on découpe la proposition en fonction des espaces
-      // et puis on les convertit en entiers un par un (dans un tableau de
-      // propostion qui était déjà alloué)
+      char *token = strtok(buffer, " ");
       while (token != NULL && j < niveau) {
-        proposition[j++] =
-            atoi(token); // conversion de la chaine de caractère en entier
-        token = strtok(NULL, " "); // on continue à découper la chaine
+        proposition[j++] = atoi(token);
+        token = strtok(NULL, " ");
       }
-      if (j != niveau) { // on controlle si la proposition est complète
+      if (j != niveau) {
         printf("Proposition incomplète reçue.\n");
-        free(proposition); // on libère la mémoire allouée
+        free(proposition);
         continue;
       }
 
       /* Calcul du résultat */
-      int red, white; // on initialise le nombre de couleurs bien placées et mal
-                      // placées
-      calculate_result(
-          niveau, secret, proposition, &red,
-          &white); // on utlise une methode auxiliare pour assigner les valeurs
-      free(proposition); // on libère la mémoire allouée
+      int red, white;
+      calculate_result(niveau, secret, proposition, &red, &white);
+      free(proposition);
 
-      memset(buffer, 0, sizeof(buffer)); // on vide le buffer
-      if (red == niveau) { // si on a gagné ca veut dire on trouve le code
-                           // secret (rouge=niveau)
+      memset(buffer, 0, sizeof(buffer));
+      if (red == niveau) {
         sprintf(buffer, "GAGNE! Red: %d, White: %d\n", red, white);
-        gagne = 1; // sortir de la boucle
+        gagne = 1;
       } else {
         sprintf(buffer, "Red: %d, White: %d\n", red, white);
       }
-      h_writes(sock_client, buffer,
-               strlen(buffer)); // on envoie le résultat au client
-               
+      h_writes(sock_client, buffer, strlen(buffer));
     } /* Fin d'une partie */
 
-    free(secret); // on libère la mémoire allouée pour le code secret
+    free(secret);
 
     /* Invitation à rejouer */
-    memset(buffer, 0, sizeof(buffer)); // on vide le buffer
-    sprintf(buffer, "VOULEZ_VOUS_REJOUER?\n"); 
-    h_writes(sock_client, buffer,
-             strlen(buffer)); // on envoie la question au client
-    // on lui demande s'il veut rejouer ou pas
-    // on lui demande de nous donner une réponse
     memset(buffer, 0, sizeof(buffer));
-    if (read_line(sock_client, buffer, sizeof(buffer)) <=
-        0) { // on lit la réponse du client
-      // on controlle si la lecture s'est bien passée
-      // si la lecture n'est pas bien passée on sort de la boucle
+    sprintf(buffer, "Voulez-vous rejouer ? (o/n) :\n");
+    h_writes(sock_client, buffer, strlen(buffer));
+    memset(buffer, 0, sizeof(buffer));
+    if (read_line(sock_client, buffer, sizeof(buffer)) <= 0) {
       printf("Erreur lors de la lecture du choix de rejouer.\n");
       break;
     }
 
 
 
-    if (!(buffer[0] == 'o' ||
-          buffer[0] ==
-              'O')) { // si le client ne veut pas rejouer on ferme la session
+    if (!(buffer[0] == 'o' || buffer[0] == 'O')) {
       session = 0;
-      printf("Le client a choisi de ne pas rejouer.\n");
-    } else { // sinon on continue à jouer
-      printf("Nouvelle partie demandée par le client.\n");
+      printf("Le client (PID %d) a choisi de ne pas rejouer.\n", getpid());
+    } else {
+      printf("Nouvelle partie demandée par le client (PID %d).\n", getpid());
     }
-  }
+  } /* Fin de la session de jeu pour ce client */
 
-  h_close(sock_client); // on ferme la socket client
-  h_close(sock);        // on ferme la socket serveur
-  printf("Connexion terminée.\n");
+  h_close(sock_client);
+  printf("Session terminée pour le client (PID %d).\n", getpid());
+  exit(0);
 }
-
 /******************************************************************************/
 
 /*
