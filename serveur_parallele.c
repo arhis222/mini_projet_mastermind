@@ -213,11 +213,17 @@ void game_session(int sock_client) {
     free(secret);
 
     /* Invitation à rejouer */
+    memset(buffer, 0, sizeof(buffer)); // on vide le buffer
+    sprintf(buffer, "VOULEZ_VOUS_REJOUER?\n"); 
+    h_writes(sock_client, buffer,
+             strlen(buffer)); // on envoie la question au client
+    // on lui demande s'il veut rejouer ou pas
+    // on lui demande de nous donner une réponse
     memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer, "Voulez-vous rejouer ? (o/n) :\n");
-    h_writes(sock_client, buffer, strlen(buffer));
-    memset(buffer, 0, sizeof(buffer));
-    if (read_line(sock_client, buffer, sizeof(buffer)) <= 0) {
+    if (read_line(sock_client, buffer, sizeof(buffer)) <=
+        0) { // on lit la réponse du client
+      // on controlle si la lecture s'est bien passée
+      // si la lecture n'est pas bien passée on sort de la boucle
       printf("Erreur lors de la lecture du choix de rejouer.\n");
       break;
     }
