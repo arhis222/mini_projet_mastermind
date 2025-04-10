@@ -1,0 +1,2 @@
+essaicurse: 
+	gcc EssaiCurses.c -o essaicurse  -L/usr/ccs/lib -L/usr/ucblib  -lcurses -ltermcap

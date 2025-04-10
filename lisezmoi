@@ -1,0 +1,8 @@
+Derniere version des fonctions  associees aux sockets 
+
+makefile permettant de compiler sous differents systemes
+Utiliser gmake et non make
+
+Si probleme lors de l'execution avec ucblib rajouter: setenv LD_LIBRARY /usr/ucblib/
+
+Essaicurses et le make associe makecurse permettent de comprendre les primitives de gestions de curseur dans plusieurs fenetres. Permet de faire un joli TALK.

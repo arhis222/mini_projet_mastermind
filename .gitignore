@@ -1,0 +1,29 @@
+# Compiler files
+*.o
+*.out
+*.exe
+*.a
+*.so
+*.dll
+
+# VSCode files
+.vscode/
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+Makefile
+Makefile.user
+CMakeLists.txt.user
+cmake_install.cmake
+
+# Temps
+*.log
+*.tmp
+*.swp
+*.bak
+
+
+*.dSYM/
+*.obj
+*.pch
