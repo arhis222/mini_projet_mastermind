@@ -1,4 +1,4 @@
-Jeu de Couleurs - Client / Serveur
+Jeu de Couleurs MASTERMIND - Client / Serveur
 ==================================
 
 Ce projet implémente un jeu basé sur des communications entre un serveur et un ou plusieurs clients,
@@ -61,7 +61,7 @@ Il est aussi possible de jouer à distance :
 - Exemple client :
 
       ./client 192.168.1.10 1234
-      
+
 Remarques Importantes
 ---------------------
 
@@ -70,6 +70,8 @@ Remarques Importantes
 
 - Si vous lancez ./client avant le serveur, le client va se bloquer,
   ce qui est prévu par le fonctionnement du programme (puisqu’il n’arrive pas à se connecter).
+
+- Il faut bien suivre les instructions de jeu donné en terminal pour que le programme fonctionne correctement.
 
 Fichiers Principaux
 -------------------
