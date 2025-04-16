@@ -90,7 +90,7 @@ void client_appli(char *serveur, char *service)
   struct sockaddr_in *adr_serv; // Adresse du serveur
   char buffer[256];             // Buffer pour les messages
 
-  /* Création de la socket TCP */
+
   sock = h_socket(AF_INET, SOCK_STREAM); // création de la socket TCP en
                                          // utilisant IP protocol family.
   // Comme décrit dans la page 4 du SOCKET.pdf, le mode de la socket est

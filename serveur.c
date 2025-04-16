@@ -24,6 +24,10 @@
 #include <time.h>
 #include <unistd.h> /* Pour read() */
 
+/* Définition des codes couleurs ANSI pour l'affichage */
+#define ANSI_COLOR_GREEN "\033[32m"
+#define ANSI_COLOR_RESET "\033[0m"
+
 /* Définition du numéro de service par défaut */
 #define SERVICE_DEFAUT "1111"
 
@@ -76,7 +80,6 @@ void serveur_appli(char *service)
   struct sockaddr_in adr_client; // Adresse du client
   char buffer[256];              // Buffer pour les messages
 
-  /* Création de la socket TCP */
   sock = h_socket(AF_INET, SOCK_STREAM); // création de la socket TCP en
                                          // utilisant IP protocol family.
   // Comme décrit dans la page 4 du SOCKET.pdf, le mode de la socket est
@@ -132,7 +135,7 @@ void serveur_appli(char *service)
     srand(time(NULL)); // Initialisation du générateur de nombres aléatoires
     int *secret = generate_secret_code(
         niveau); // on génère le code secret avec une methode auxiliare
-    printf("Code secret généré : ");
+    printf(ANSI_COLOR_GREEN  "Code secret généré : "  ANSI_COLOR_RESET);
     for (int i = 0; i < niveau; i++) {
       printf("%d ", secret[i]); // on affiche le code secret
     }

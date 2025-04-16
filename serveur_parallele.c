@@ -24,6 +24,10 @@
 #include <time.h>
 #include <unistd.h> /* Pour read() */
 
+/* Définition des codes couleurs ANSI pour l'affichage */
+#define ANSI_COLOR_GREEN "\033[32m"
+#define ANSI_COLOR_RESET "\033[0m"
+
 /* Définition du numéro de service par défaut */
 #define SERVICE_DEFAUT "1111"
 
@@ -159,7 +163,7 @@ void game_session(int sock_client) {
     srand(time(NULL)); // Initialisation du générateur de nombres aléatoires
     /* Génération du code secret */
     int *secret = generate_secret_code(niveau);
-    printf("Code secret généré pour le client (PID %d) : ", getpid());
+    printf(ANSI_COLOR_GREEN "Code secret généré pour le client (PID %d) : " ANSI_COLOR_RESET , getpid());
     for (int i = 0; i < niveau; i++) {
       printf("%d ", secret[i]);
     }
